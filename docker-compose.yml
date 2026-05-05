@@ -7,9 +7,10 @@ services:
     devices:
       - /dev/net/tun:/dev/net/tun
     environment:
-      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_SERVICE_PROVIDER=mullvad
       - VPN_TYPE=wireguard
-      - WIREGUARD_PRIVATE_KEY=${NORDVPN_WG_KEY}
+      - WIREGUARD_PRIVATE_KEY=${MULLVAD_WG_KEY}
+      - WIREGUARD_ADDRESSES=${MULLVAD_WG_ADDR}
       - SERVER_COUNTRIES=${VPN_COUNTRY:-Netherlands}
     restart: unless-stopped
 

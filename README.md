@@ -77,13 +77,12 @@ js-analysis/
 ### On the host machine
 
 - Docker and Docker Compose (v2)
-- A NordVPN subscription
+- A Mullvad subscription
+- `wireguard-tools`, `curl`, `jq` (only needed to run `scripts/rotate_key.sh`)
 
-### NordVPN WireGuard key
+### Mullvad account number
 
-1. Log in to [my.nordaccount.com](https://my.nordaccount.com)
-2. Go to **NordVPN → Manual setup → WireGuard**
-3. Generate a key pair and copy the **Private Key**
+Your Mullvad account number is the 16-digit number shown at [mullvad.net/account](https://mullvad.net/account). No email or password — just the number.
 
 ---
 
@@ -100,12 +99,20 @@ cd js-analysis
 cp .env.example .env
 ```
 
-Edit `.env`:
+Set your account number in `.env`:
 
 ```env
-NORDVPN_WG_KEY=your_wireguard_private_key_here
-VPN_COUNTRY=Netherlands         # optional, any NordVPN server country
+MULLVAD_ACCOUNT=0000000000000000
+VPN_COUNTRY=Netherlands
 ```
+
+Then generate and register a WireGuard key automatically:
+
+```bash
+bash scripts/rotate_key.sh
+```
+
+This generates a key pair locally, registers the public key with Mullvad's API, and writes `MULLVAD_WG_KEY` and `MULLVAD_WG_ADDR` back into `.env`. Run it any time you want to rotate the key.
 
 ### 2. Set up notification provider
 
@@ -382,7 +389,18 @@ gitleaks CSV reports are also written to `reports/gitleaks_<domain>.csv` for eac
 
 ## VPN configuration
 
-All traffic from the `worker` and `scheduler` containers is routed through gluetun, which maintains a NordVPN WireGuard tunnel.
+All traffic from the `worker` and `scheduler` containers is routed through gluetun, which maintains a Mullvad WireGuard tunnel.
+
+### Rotate the WireGuard key
+
+Mullvad keys are stable (no device-slot eviction) but can be rotated at any time:
+
+```bash
+bash scripts/rotate_key.sh
+docker compose restart gluetun
+```
+
+The script generates a new key pair locally, registers the public key with Mullvad's API, and updates `MULLVAD_WG_KEY` and `MULLVAD_WG_ADDR` in `.env` automatically. The private key is never sent to Mullvad.
 
 ### Change exit country
 
@@ -404,11 +422,11 @@ docker compose restart gluetun
 docker compose exec worker curl -s https://ipinfo.io
 ```
 
-The response should show a NordVPN IP, not your home IP.
+The response should show a Mullvad exit IP, not your home IP. You can also verify at [mullvad.net/check](https://mullvad.net/check).
 
 ### Supported countries
 
-Any NordVPN server country name works (e.g., `Germany`, `United States`, `Japan`, `Singapore`). For city-level selection, add to `docker-compose.yml`:
+Any country name supported by Mullvad works (e.g., `Germany`, `United States`, `Japan`, `Singapore`). For city-level selection, add to `docker-compose.yml`:
 
 ```yaml
 environment:

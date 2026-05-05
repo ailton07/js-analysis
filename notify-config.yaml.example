@@ -1,0 +1,16 @@
+# Copy to notify-config.yaml and fill in your webhook(s).
+# This file is mounted into the container — never commit the real one.
+# Full provider list: https://github.com/projectdiscovery/notify
+
+discord:
+  - id: "js-secrets"
+    discord_webhook_url: "https://discord.com/api/webhooks/YOUR_ID/YOUR_TOKEN"
+    discord_username: "js-hunter"
+    discord_format: "{{data}}"
+    discord_webhook_type: "regular"
+
+# slack:
+#   - id: "js-secrets"
+#     slack_webhook_url: "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+#     slack_username: "js-hunter"
+#     slack_format: "{{data}}"

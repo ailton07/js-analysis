@@ -1,0 +1,10 @@
+.env
+notify-config.yaml
+data/
+reports/
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
+targets/*.yaml
+!targets/example-target.yaml

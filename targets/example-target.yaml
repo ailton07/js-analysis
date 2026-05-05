@@ -1,0 +1,21 @@
+domain: example.com
+program: "HackerOne - Example Program"
+
+# Scope filters applied to collected URLs (substring match)
+scope:
+  - "example.com"
+
+# URLs containing any of these strings are skipped
+exclude:
+  - "cdn.example.com"
+  - "static.third-party.com"
+
+crawl_depth: 2
+max_urls: 3000
+
+# Cron schedule for recurring scans (standard 5-field cron)
+# This example runs nightly at 03:00
+schedule: "0 3 * * *"
+
+# Send findings to notify (requires notify-config.yaml to be mounted)
+notify: true

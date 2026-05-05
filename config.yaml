@@ -1,0 +1,35 @@
+data_dir: data
+reports_dir: reports
+
+fetcher:
+  delay: 1.5          # seconds between requests
+  jitter: 0.5         # random ± added to delay
+  max_concurrent: 3
+  timeout: 15
+  max_content_mb: 10
+  valid_content_types:
+    - application/javascript
+    - text/javascript
+    - application/x-javascript
+    - text/plain
+
+collectors:
+  katana:
+    depth: 2
+    timeout: 300      # max seconds katana is allowed to run
+    js_crawl: true    # requires chromium; set false to disable headless crawling
+  waymore:
+    mode: U           # URLs only
+
+scanners:
+  min_entropy_notify: 3.5
+  high_value_types:
+    - aws
+    - github
+    - stripe
+    - twilio
+    - slack
+    - sendgrid
+    - jwt
+    - private_key
+    - google

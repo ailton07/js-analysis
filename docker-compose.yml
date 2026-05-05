@@ -1,0 +1,42 @@
+services:
+  gluetun:
+    image: qmcgaw/gluetun:latest
+    container_name: gluetun
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    environment:
+      - VPN_SERVICE_PROVIDER=nordvpn
+      - VPN_TYPE=wireguard
+      - WIREGUARD_PRIVATE_KEY=${NORDVPN_WG_KEY}
+      - SERVER_COUNTRIES=${VPN_COUNTRY:-Netherlands}
+    restart: unless-stopped
+
+  worker:
+    build: .
+    container_name: js-worker
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./targets:/app/targets
+      - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
+    command: worker
+    restart: unless-stopped
+
+  scheduler:
+    build: .
+    container_name: js-scheduler
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    volumes:
+      - ./data:/app/data
+      - ./reports:/app/reports
+      - ./targets:/app/targets
+      - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
+    command: scheduler
+    restart: unless-stopped

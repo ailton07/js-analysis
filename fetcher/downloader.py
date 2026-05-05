@@ -1,11 +1,13 @@
 import hashlib
 import random
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 import requests
 from requests.adapters import HTTPAdapter
+from rich.progress import BarColumn, MofNCompleteColumn, Progress, TimeElapsedColumn
 from urllib3.util.retry import Retry
 
 from db import store
@@ -139,6 +141,7 @@ def fetch_all(
     target_id: int,
     raw_dir: Path,
     config: dict,
+    on_progress: Callable[[int, int], None] | None = None,
 ) -> list[dict]:
     cfg = config.get("fetcher", {})
     delay = cfg.get("delay", 1.5)
@@ -149,18 +152,30 @@ def fetch_all(
 
     raw_dir.mkdir(parents=True, exist_ok=True)
     session = _make_session(timeout)
+    total = len(urls)
 
     results = []
-    with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
-        futures = {
-            executor.submit(
-                _fetch_one, url, session, raw_dir, delay, jitter, max_bytes, target_id
-            ): url
-            for url in urls
-        }
-        for future in as_completed(futures):
-            result = future.result()
-            if result:
-                results.append(result)
+    with Progress(
+        "[progress.description]{task.description}",
+        BarColumn(),
+        MofNCompleteColumn(),
+        TimeElapsedColumn(),
+        transient=True,
+    ) as progress:
+        task = progress.add_task("  fetching", total=total)
+        with ThreadPoolExecutor(max_workers=max_concurrent) as executor:
+            futures = {
+                executor.submit(
+                    _fetch_one, url, session, raw_dir, delay, jitter, max_bytes, target_id
+                ): url
+                for url in urls
+            }
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    results.append(result)
+                progress.advance(task)
+                if on_progress:
+                    on_progress(progress.tasks[task].completed, total)
 
     return results

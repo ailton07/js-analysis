@@ -64,6 +64,36 @@ def test_tools() -> None:
     import subprocess
     import sys
 
+    import requests
+
+    results: list[str] = []
+    all_ok = True
+
+    # VPN check — must pass before tools are tested
+    console.print("[bold]VPN[/bold]")
+    try:
+        resp = requests.get("https://am.i.mullvad.net/json", timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        ip = data.get("ip", "?")
+        country = data.get("country", "?")
+        city = data.get("city", "?")
+        is_mullvad = data.get("mullvad_exit_ip", False)
+        if is_mullvad:
+            detail = f"{ip}  ({city}, {country})"
+            console.print(f"  [green]OK[/green]  mullvad       {detail}")
+            results.append(f"OK  mullvad       {detail}")
+        else:
+            detail = f"exit IP {ip} is NOT a Mullvad node"
+            console.print(f"  [red]FAIL[/red]  mullvad       {detail}")
+            results.append(f"FAIL  mullvad       {detail}")
+            all_ok = False
+    except Exception as exc:
+        console.print(f"  [red]FAIL[/red]  mullvad       {exc}")
+        results.append(f"FAIL  mullvad       {exc}")
+        all_ok = False
+
+    console.print("[bold]Tools[/bold]")
     checks = [
         ("katana",      ["katana", "-version"]),
         ("notify",      ["notify", "-version"]),
@@ -72,8 +102,6 @@ def test_tools() -> None:
         ("waymore",     ["waymore", "--version"]),
     ]
 
-    results: list[str] = []
-    all_ok = True
     for name, cmd in checks:
         try:
             result = subprocess.run(

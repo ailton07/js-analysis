@@ -1,6 +1,7 @@
 import shutil
 from pathlib import Path
 
+import requests
 import yaml
 from rich.console import Console
 
@@ -18,12 +19,29 @@ def load_global_config() -> dict:
     return yaml.safe_load(path.read_text()) if path.exists() else {}
 
 
+def _check_vpn() -> None:
+    """Abort if traffic is not exiting through a Mullvad node."""
+    try:
+        data = requests.get("https://am.i.mullvad.net/json", timeout=10).json()
+    except Exception as exc:
+        raise SystemExit(f"VPN check failed — could not reach am.i.mullvad.net: {exc}")
+    if not data.get("mullvad_exit_ip", False):
+        ip = data.get("ip", "unknown")
+        raise SystemExit(f"VPN check failed — exit IP {ip} is not a Mullvad node. Aborting.")
+    ip = data.get("ip", "?")
+    city = data.get("city", "?")
+    country = data.get("country", "?")
+    console.print(f"[green]VPN OK[/green]  {ip}  ({city}, {country})")
+
+
 def run_pipeline(target_config_path: str) -> None:
     global_cfg = load_global_config()
     target_cfg = yaml.safe_load(Path(target_config_path).read_text())
 
     if not target_cfg.get("enabled", True):
         raise SystemExit(f"Target '{target_config_path}' is disabled (enabled: false). Copy it and set enabled: true.")
+
+    _check_vpn()
 
     domain = target_cfg["domain"]
     program = target_cfg.get("program", domain)
@@ -88,8 +106,20 @@ def run_pipeline(target_config_path: str) -> None:
 
     # ── 2. Fetch ─────────────────────────────────────────────────────────────
     console.print("[yellow]Fetching JS files...")
-    vprogress(f"[{domain}] fetching JS files...")
-    fetched = fetch_all(url_list, target_id, raw_dir, global_cfg)
+    vprogress(f"[{domain}] fetching JS files (0 / {len(url_list)})...")
+
+    _notified_pct: set[int] = set()
+
+    def _fetch_progress(done: int, total: int) -> None:
+        if not verbose or total == 0:
+            return
+        pct = int(done / total * 100)
+        milestone = pct - (pct % 25)
+        if milestone > 0 and milestone not in _notified_pct:
+            _notified_pct.add(milestone)
+            notifier.progress(f"[{domain}] fetching JS files — {done}/{total} ({milestone}%)")
+
+    fetched = fetch_all(url_list, target_id, raw_dir, global_cfg, on_progress=_fetch_progress)
     new_files = [f for f in fetched if not f["already_known"]]
     console.print(f"  fetched {len(fetched)}, new {len(new_files)}")
     vprogress(f"[{domain}] fetched {len(fetched)} files ({len(new_files)} new)")

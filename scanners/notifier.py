@@ -1,11 +1,20 @@
 import subprocess
 
 
+def progress(text: str) -> None:
+    """Send a pipeline progress update through notify."""
+    _send(text)
+
+
 def notify(finding: dict) -> None:
+    _send(_format(finding))
+
+
+def _send(text: str) -> None:
     try:
         subprocess.run(
             ["notify", "-silent"],
-            input=_format(finding).encode(),
+            input=text.encode(),
             capture_output=True,
             check=False,
             timeout=10,

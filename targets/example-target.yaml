@@ -1,3 +1,5 @@
+enabled: false   # template only — copy this file and set enabled: true
+
 domain: example.com
 program: "HackerOne - Example Program"
 
@@ -13,9 +15,13 @@ exclude:
 crawl_depth: 2
 max_urls: 3000
 
-# Cron schedule for recurring scans (standard 5-field cron)
-# This example runs nightly at 03:00
-schedule: "0 3 * * *"
+# schedule: ~               → one-shot: never auto-enqueued, run manually
+# schedule: "0 3 * * *"    → recurring nightly at 03:00
+# schedule: "0 */6 * * *"  → recurring every 6 hours
+schedule: ~
 
 # Send findings to notify (requires notify-config.yaml to be mounted)
 notify: true
+
+# Send pipeline progress through notify at each stage (collect / fetch / scan / done)
+verbose: false

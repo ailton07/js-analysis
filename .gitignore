@@ -1,5 +1,6 @@
 .env
 notify-config.yaml
+mullvad_wireguard_*
 data/
 reports/
 __pycache__/

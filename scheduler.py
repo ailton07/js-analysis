@@ -15,6 +15,9 @@ def _load_targets() -> list[dict]:
     for path in Path("targets").glob("*.yaml"):
         try:
             cfg = yaml.safe_load(path.read_text())
+            if not cfg.get("enabled", True):
+                console.print(f"  [dim]{path.name}: disabled, skipping")
+                continue
             cfg["_path"] = str(path)
             targets.append(cfg)
         except Exception as exc:
@@ -27,8 +30,8 @@ def _schedule_target(scheduler: BlockingScheduler, target: dict) -> None:
     cron = target.get("schedule")
     config_path = target["_path"]
 
-    if not cron:
-        console.print(f"  [yellow]{domain}: no schedule, skipping")
+    if not cron or cron is False:
+        console.print(f"  [dim]{domain}: one-shot (run manually)")
         return
 
     parts = cron.split()

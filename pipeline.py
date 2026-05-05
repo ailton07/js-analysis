@@ -22,6 +22,9 @@ def run_pipeline(target_config_path: str) -> None:
     global_cfg = load_global_config()
     target_cfg = yaml.safe_load(Path(target_config_path).read_text())
 
+    if not target_cfg.get("enabled", True):
+        raise SystemExit(f"Target '{target_config_path}' is disabled (enabled: false). Copy it and set enabled: true.")
+
     domain = target_cfg["domain"]
     program = target_cfg.get("program", domain)
 
@@ -37,10 +40,18 @@ def run_pipeline(target_config_path: str) -> None:
     store.init(data_dir / "findings.db")
     target_id = store.get_or_create_target(domain, program, target_config_path)
 
+    verbose = target_cfg.get("verbose", False)
+
+    def vprogress(text: str) -> None:
+        if verbose:
+            notifier.progress(text)
+
     console.rule(f"[bold cyan]{domain}")
+    vprogress(f"[{domain}] scan started")
 
     # ── 1. Collect ──────────────────────────────────────────────────────────
     console.print("[yellow]Collecting JS URLs...")
+    vprogress(f"[{domain}] collecting JS URLs...")
     urls: set[str] = set()
 
     try:
@@ -73,15 +84,19 @@ def run_pipeline(target_config_path: str) -> None:
 
     url_list = list(urls)[: target_cfg.get("max_urls", 5000)]
     console.print(f"  total   : {len(url_list):>5} (after dedup / filters)")
+    vprogress(f"[{domain}] collected {len(url_list)} JS URLs")
 
     # ── 2. Fetch ─────────────────────────────────────────────────────────────
     console.print("[yellow]Fetching JS files...")
+    vprogress(f"[{domain}] fetching JS files...")
     fetched = fetch_all(url_list, target_id, raw_dir, global_cfg)
     new_files = [f for f in fetched if not f["already_known"]]
     console.print(f"  fetched {len(fetched)}, new {len(new_files)}")
+    vprogress(f"[{domain}] fetched {len(fetched)} files ({len(new_files)} new)")
 
     # ── 3. Normalize new files only ──────────────────────────────────────────
     console.print("[yellow]Normalizing...")
+    vprogress(f"[{domain}] normalizing {len(new_files)} new files...")
     normalized = 0
     for f in new_files:
         in_path = raw_dir / f"{f['hash']}.js"
@@ -107,6 +122,7 @@ def run_pipeline(target_config_path: str) -> None:
 
     # ── 5. Scan ───────────────────────────────────────────────────────────────
     console.print("[yellow]Scanning...")
+    vprogress(f"[{domain}] scanning with gitleaks + trufflehog...")
     all_findings: list[dict] = []
 
     try:
@@ -136,6 +152,7 @@ def run_pipeline(target_config_path: str) -> None:
                 notifier.notify(finding)
 
     console.print(f"[bold green]Done — {new_count} new findings.")
+    vprogress(f"[{domain}] done — {new_count} new findings")
 
     # ── 7. Clean normalized dir (findings are in DB) ──────────────────────────
     shutil.rmtree(norm_dir, ignore_errors=True)

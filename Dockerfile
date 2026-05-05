@@ -1,12 +1,17 @@
 # Stage 1: build Go tools
-FROM golang:1.22-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
-RUN apk add --no-cache git ca-certificates gcc musl-dev
+RUN apk add --no-cache git ca-certificates gcc musl-dev curl
+
+ENV CGO_ENABLED=0
 
 RUN go install github.com/projectdiscovery/katana/cmd/katana@latest
 RUN go install github.com/projectdiscovery/notify/cmd/notify@latest
-RUN go install github.com/gitleaks/gitleaks/v8@latest
-RUN go install github.com/trufflesecurity/trufflehog/v3@latest
+RUN go install github.com/zricethezav/gitleaks/v8@latest
+
+# trufflehog uses replace directives in go.mod — go install is rejected; use official script
+RUN curl -sSfL https://raw.githubusercontent.com/trufflesecurity/trufflehog/main/scripts/install.sh \
+    | sh -s -- -b /go/bin
 
 # Stage 2: Python runtime
 FROM python:3.11-slim

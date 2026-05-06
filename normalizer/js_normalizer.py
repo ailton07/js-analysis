@@ -64,5 +64,5 @@ def normalize(input_path: Path, output_path: Path) -> bool:
     content = _flatten_concat(content)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(content, encoding="utf-8")
+    output_path.write_bytes(content.encode("utf-8", errors="replace"))
     return True

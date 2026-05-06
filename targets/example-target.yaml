@@ -25,3 +25,12 @@ notify: true
 
 # Send pipeline progress through notify at each stage (collect / fetch / scan / done)
 verbose: false
+
+# Per-target rate limit — overrides global config.yaml fetcher values
+# Omit the block entirely (or any individual key) to use the global default
+# rate_limit:
+#   delay: 1.5          # seconds between requests
+#   jitter: 0.5         # random extra delay added per request
+#   max_concurrent: 3   # parallel download threads
+#   timeout: 15         # per-request timeout (seconds)
+#   max_content_mb: 10  # skip files larger than this

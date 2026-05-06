@@ -119,7 +119,14 @@ def run_pipeline(target_config_path: str) -> None:
             _notified_pct.add(milestone)
             notifier.progress(f"[{domain}] fetching JS files — {done}/{total} ({milestone}%)")
 
-    fetched = fetch_all(url_list, target_id, raw_dir, global_cfg, on_progress=_fetch_progress)
+    effective_cfg = {**global_cfg}
+    if target_cfg.get("rate_limit"):
+        effective_cfg = {
+            **global_cfg,
+            "fetcher": {**global_cfg.get("fetcher", {}), **target_cfg["rate_limit"]},
+        }
+
+    fetched = fetch_all(url_list, target_id, raw_dir, effective_cfg, on_progress=_fetch_progress)
     new_files = [f for f in fetched if not f["already_known"]]
     console.print(f"  fetched {len(fetched)}, new {len(new_files)}")
     vprogress(f"[{domain}] fetched {len(fetched)} files ({len(new_files)} new)")
@@ -128,20 +135,30 @@ def run_pipeline(target_config_path: str) -> None:
     console.print("[yellow]Normalizing...")
     vprogress(f"[{domain}] normalizing {len(new_files)} new files...")
     normalized = 0
+    skipped = 0
     for f in new_files:
         in_path = raw_dir / f"{f['hash']}.js"
         out_path = norm_dir / f"{f['hash']}.js"
         if in_path.exists() and not out_path.exists():
-            if normalize(in_path, out_path):
-                normalized += 1
+            try:
+                if normalize(in_path, out_path):
+                    normalized += 1
+            except Exception as exc:
+                console.print(f"  [yellow]normalize warning ({f['hash'][:8]}): {exc}")
+                skipped += 1
         for sm in f.get("sourcemap_files", []):
             if not sm["already_known"]:
                 sm_in = raw_dir / f"{sm['hash']}.js"
                 sm_out = norm_dir / f"{sm['hash']}.js"
                 if sm_in.exists() and not sm_out.exists():
-                    if normalize(sm_in, sm_out):
-                        normalized += 1
-    console.print(f"  normalized {normalized} files")
+                    try:
+                        if normalize(sm_in, sm_out):
+                            normalized += 1
+                    except Exception as exc:
+                        console.print(f"  [yellow]normalize warning ({sm['hash'][:8]}): {exc}")
+                        skipped += 1
+    skip_note = f", {skipped} skipped" if skipped else ""
+    console.print(f"  normalized {normalized} files{skip_note}")
 
     # ── 4. Build url_map for scanners ────────────────────────────────────────
     url_map: dict[str, str] = {}

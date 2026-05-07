@@ -1,5 +1,6 @@
 .env
 notify-config.yaml
+waymore.yml
 mullvad_wireguard_*
 data/
 reports/

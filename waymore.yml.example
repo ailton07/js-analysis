@@ -1,0 +1,6 @@
+# Copy to waymore.yml and fill in your API keys.
+# Mounted read-only into the container at /root/.config/waymore/config.yml
+# Full option reference: https://github.com/xnl-h4ck3r/waymore
+
+URLSCAN_API_KEY: YOUR_URLSCAN_API_KEY
+VIRUSTOTAL_API_KEY: YOUR_VIRUSTOTAL_API_KEY

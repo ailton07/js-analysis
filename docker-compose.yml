@@ -25,6 +25,7 @@ services:
       - ./reports:/app/reports
       - ./targets:/app/targets
       - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
+      - ./waymore.yml:/root/.config/waymore/config.yml:ro
     command: worker
     restart: unless-stopped
 
@@ -39,5 +40,6 @@ services:
       - ./reports:/app/reports
       - ./targets:/app/targets
       - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
+      - ./waymore.yml:/root/.config/waymore/config.yml:ro
     command: scheduler
     restart: unless-stopped

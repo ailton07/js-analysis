@@ -26,6 +26,7 @@ services:
       - ./targets:/app/targets
       - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
       - ./waymore.yml:/root/.config/waymore/config.yml:ro
+      - ./gitleaks.toml:/app/gitleaks.toml:ro
     command: worker
     restart: unless-stopped
 
@@ -41,5 +42,6 @@ services:
       - ./targets:/app/targets
       - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
       - ./waymore.yml:/root/.config/waymore/config.yml:ro
+      - ./gitleaks.toml:/app/gitleaks.toml:ro
     command: scheduler
     restart: unless-stopped

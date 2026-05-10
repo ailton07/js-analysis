@@ -11,19 +11,20 @@ def scan(
 ) -> list[dict]:
     report_path.parent.mkdir(parents=True, exist_ok=True)
 
+    config_path = Path("/app/gitleaks.toml")
+    cmd = [
+        "gitleaks", "detect",
+        "--source", str(source_dir),
+        "--report-format", "csv",
+        "--report-path", str(report_path),
+        "--no-git",
+        "--exit-code", "0",
+    ]
+    if config_path.exists():
+        cmd += ["--config", str(config_path)]
+
     try:
-        subprocess.run(
-            [
-                "gitleaks", "detect",
-                "--source", str(source_dir),
-                "--report-format", "csv",
-                "--report-path", str(report_path),
-                "--no-git",
-                "--exit-code", "0",
-            ],
-            capture_output=True,
-            check=False,
-        )
+        subprocess.run(cmd, capture_output=True, check=False)
     except FileNotFoundError:
         raise RuntimeError(
             "gitleaks not found — install with: "

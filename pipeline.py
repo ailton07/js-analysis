@@ -49,8 +49,8 @@ def run_pipeline(target_config_path: str) -> None:
     data_dir = Path(global_cfg.get("data_dir", "data"))
     reports_dir = Path(global_cfg.get("reports_dir", "reports"))
     tmp_dir = data_dir / "tmp"
-    raw_dir = data_dir / "raw_js"
-    norm_dir = data_dir / "normalized_js"
+    raw_dir = data_dir / domain / "raw_js"
+    norm_dir = data_dir / domain / "normalized_js"
 
     for d in (tmp_dir, raw_dir, norm_dir, reports_dir):
         d.mkdir(parents=True, exist_ok=True)

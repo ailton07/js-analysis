@@ -91,7 +91,8 @@ Set `enabled: true` and fill in the domain, scope, and schedule. See [Target con
 ### 4. Build and start
 
 ```bash
-docker compose up --build -d
+docker compose build
+docker compose up -d
 ```
 
 | Container | Role |

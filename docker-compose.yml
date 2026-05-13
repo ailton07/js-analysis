@@ -12,7 +12,6 @@ services:
       - WIREGUARD_PRIVATE_KEY=${MULLVAD_WG_KEY}
       - WIREGUARD_ADDRESSES=${MULLVAD_WG_ADDR}
       - SERVER_COUNTRIES=${VPN_COUNTRY:-Netherlands}
-    restart: unless-stopped
 
   worker:
     build: .

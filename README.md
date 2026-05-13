@@ -109,10 +109,10 @@ docker compose up --build -d
 Set `schedule: ~` in the target YAML, then run:
 
 ```bash
-docker compose run --rm worker run targets/myprogram.yaml
+bash scripts/run_worker.sh run targets/myprogram.yaml
 ```
 
-The full service does not need to be running. Executes the pipeline once and exits.
+The full service does not need to be running. Starts gluetun automatically, executes the pipeline once, and stops gluetun when done.
 
 Output example:
 
@@ -145,7 +145,7 @@ The scheduler registers cron jobs for every enabled target with a `schedule` fie
 ### Manually enqueue a job
 
 ```bash
-docker compose run --rm worker enqueue example.com targets/myprogram.yaml
+bash scripts/run_worker.sh enqueue example.com targets/myprogram.yaml
 ```
 
 ### View live logs
@@ -481,7 +481,8 @@ js-analysis/
 ├── scheduler.py                    APScheduler-based cron runner
 ├── main.py                         CLI entry point
 ├── scripts/
-│   └── rotate_key.sh               Mullvad WireGuard key rotation via API
+│   ├── rotate_key.sh               Mullvad WireGuard key rotation via API
+│   └── run_worker.sh               one-off worker runs (starts and stops gluetun automatically)
 │
 ├── collectors/
 │   ├── waymore.py                  passive URL collection

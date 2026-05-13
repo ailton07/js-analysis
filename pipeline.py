@@ -81,11 +81,16 @@ def run_pipeline(target_config_path: str) -> None:
 
     try:
         k_cfg = global_cfg.get("collectors", {}).get("katana", {})
+        k_seeds = waymore.collect_seeds(
+            domain, tmp_dir, max_seeds=k_cfg.get("max_seeds", 300)
+        ) or [f"https://{domain}"]
+        console.print(f"  katana seeds: {len(k_seeds)} (from waymore + fallback root)")
         k_urls = katana.collect(
-            f"https://{domain}",
+            k_seeds,
             depth=target_cfg.get("crawl_depth", k_cfg.get("depth", 2)),
             js_crawl=k_cfg.get("js_crawl", True),
             timeout=k_cfg.get("timeout", 300),
+            proxy=global_cfg.get("proxy"),
         )
         console.print(f"  katana  : {len(k_urls):>5} URLs")
         urls.update(k_urls)

@@ -1,0 +1,5 @@
+# One URL or hostname per line. Supports:
+#   https://example.com
+#   example.com
+#   https://example.com/specific/path
+

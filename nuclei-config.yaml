@@ -1,0 +1,43 @@
+# Nuclei configuration
+# Equivalent to: nuclei -id <template-ids> -l targets.txt
+
+# Template IDs to run (use exclude-id to invert)
+id:
+  - txt-fingerprint
+  - wildcard-tls
+  - ssl-dns-names
+  - ssl-issuer
+  - caa-fingerprint
+  - form-detection
+  - tech-detect
+  - waf-detect
+  - http-missing-security-headers
+  - rdap-whois
+  - tls-version
+  - xss-deprecated-header
+  - missing-sri
+  - deprecated-tls
+  - cookies-without-secure
+  - cookies-without-httponly
+  - weak-cipher-suites
+  - dns-saas-service-detection
+  - nameserver-fingerprint
+  - cors-misconfig
+  - external-service-interaction
+  - missing-cookie-samesite-strict
+  - aws-detect
+  - aws-cloudfront-service
+
+# Rate limiting
+rate-limit: 50
+bulk-size: 25
+concurrency: 10
+timeout: 5
+retries: 1
+
+# Output
+output: /output/results.txt
+json-export: /output/results.json
+
+# Behaviour
+follow-redirects: true

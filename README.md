@@ -1,6 +1,11 @@
 # js-analysis
 
-A self-hosted pipeline for collecting JavaScript files from bug bounty targets, normalizing them, and scanning for secrets using gitleaks and trufflehog. Runs on a home server behind Mullvad VPN (via gluetun) and sends findings to Discord or Slack via [projectdiscovery/notify](https://github.com/projectdiscovery/notify).
+A self-hosted toolkit for bug bounty reconnaissance. Includes two independent features, both routing all traffic through a Mullvad WireGuard VPN:
+
+- **JS analysis pipeline** — collects JavaScript files from bug bounty targets, normalizes them, and scans for secrets using gitleaks and trufflehog
+- **Nuclei scanner** — runs targeted nuclei templates against a custom list of URLs, fully isolated from the JS pipeline
+
+Findings and notifications are sent to Discord, Slack, or Telegram via [projectdiscovery/notify](https://github.com/projectdiscovery/notify).
 
 ---
 
@@ -100,6 +105,7 @@ docker compose up -d
 | `gluetun` | Mullvad WireGuard tunnel — all outbound traffic routes through it |
 | `js-worker` | Polls the job queue and runs pipelines |
 | `js-scheduler` | Reads target files and enqueues jobs on their cron schedules |
+| `nuclei` | Nuclei scanner — not started by `docker compose up`, invoke explicitly (see [Nuclei](#nuclei)) |
 
 ---
 
@@ -162,6 +168,67 @@ docker compose logs -f scheduler
 ```bash
 docker compose down
 ```
+
+---
+
+## Nuclei
+
+The nuclei service runs independently from the JS analysis pipeline. It uses the same Mullvad VPN tunnel (`gluetun`) but has its own image, config, and targets file. It is excluded from `docker compose up` by default — you invoke it explicitly.
+
+### Setup
+
+1. Add targets to `nuclei-targets.txt` (one URL or hostname per line):
+
+   ```
+   https://example.com
+   https://api.example.com
+   example.com
+   ```
+
+2. Review and adjust `nuclei-config.yaml` — template IDs, rate limits, and output settings.
+
+### Run
+
+```bash
+docker compose --profile nuclei run --rm nuclei
+```
+
+gluetun must be running (or will be started automatically since nuclei depends on it).
+
+On the first run, nuclei downloads its template database. Subsequent runs reuse the cached templates unless `-update-templates` triggers an update.
+
+### Output
+
+Results are written to `data/nuclei/` on the host (created automatically on first run):
+
+| File | Content |
+|------|---------|
+| `data/nuclei/results.txt` | Plain-text findings |
+| `data/nuclei/results.json` | JSON findings (one object per line) |
+
+### Configuration (`nuclei-config.yaml`)
+
+```yaml
+# Template IDs to run (use exclude-id: to invert)
+id:
+  - tech-detect
+  - waf-detect
+  - cors-misconfig
+  # ... (24 templates total — see nuclei-config.yaml)
+
+# Rate limiting
+rate-limit: 50       # requests per second
+bulk-size: 25        # templates per host in parallel
+concurrency: 10      # parallel hosts
+
+# Output paths (inside the container — mapped to data/nuclei/ on host)
+output: /output/results.txt
+json-export: /output/results.json
+```
+
+To switch from **include** to **exclude** the listed template IDs, change `id:` to `exclude-id:`.
+
+To run all templates instead of a specific set, remove the `id:` block entirely.
 
 ---
 
@@ -476,8 +543,10 @@ Scans are incremental: on repeat runs only new or changed JS files are processed
 ```
 js-analysis/
 ├── Dockerfile                      multi-stage: Go tools + Python 3.11 + chromium
-├── docker-compose.yml              gluetun (Mullvad WireGuard) + worker + scheduler
-├── config.yaml                     global settings (delays, thresholds, paths)
+├── docker-compose.yml              gluetun (VPN) + worker + scheduler + nuclei
+├── config.yaml                     JS pipeline global settings
+├── nuclei-config.yaml              nuclei template IDs, rate limits, output paths
+├── nuclei-targets.txt              one URL per line — input for the nuclei service
 ├── pipeline.py                     core orchestration logic
 ├── scheduler.py                    APScheduler-based cron runner
 ├── main.py                         CLI entry point
@@ -514,12 +583,17 @@ js-analysis/
     ├── raw_js/                     JS files keyed by SHA-256 hash
     ├── normalized_js/              temporary — deleted after each scan
     ├── tmp/                        waymore output
+    ├── nuclei/                     nuclei results (created on first nuclei run)
+    │   ├── results.txt
+    │   └── results.json
     └── findings.db                 SQLite database
 ```
 
 ---
 
 ## Tools included in the image
+
+**JS analysis pipeline (built into the project image):**
 
 | Tool | Version | Purpose |
 |------|---------|---------|
@@ -528,4 +602,15 @@ js-analysis/
 | [gitleaks](https://github.com/gitleaks/gitleaks) | v8 | Rule-based secret detection |
 | [trufflehog](https://github.com/trufflesecurity/trufflehog) | v3 | Entropy-based secret detection |
 | [notify](https://github.com/projectdiscovery/notify) | latest | Multi-provider notifications (findings + progress) |
-| [gluetun](https://github.com/qdm12/gluetun) | latest | Mullvad WireGuard VPN tunnel |
+
+**Nuclei (separate official image):**
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [nuclei](https://github.com/projectdiscovery/nuclei) | latest | Template-based vulnerability and fingerprint scanning |
+
+**Infrastructure:**
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [gluetun](https://github.com/qdm12/gluetun) | latest | Mullvad WireGuard VPN tunnel (shared by all services) |

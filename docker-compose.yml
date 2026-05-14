@@ -44,3 +44,17 @@ services:
       - ./gitleaks.toml:/app/gitleaks.toml:ro
     command: scheduler
     restart: unless-stopped
+
+  nuclei:
+    image: projectdiscovery/nuclei:latest
+    container_name: nuclei
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    volumes:
+      - ./data/nuclei:/output
+      - ./nuclei-targets.txt:/targets.txt:ro
+      - ./nuclei-config.yaml:/root/.config/nuclei/config.yaml:ro
+    command: ["-l", "/targets.txt", "-update-templates"]
+    profiles:
+      - nuclei

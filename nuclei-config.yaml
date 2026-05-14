@@ -1,8 +1,9 @@
 # Nuclei configuration
-# Equivalent to: nuclei -id <template-ids> -l targets.txt
+# Runs ALL templates except the ones listed below.
+# Equivalent to: nuclei -eid <template-ids> -l targets.txt
 
-# Template IDs to run (use exclude-id to invert)
-id:
+# Templates to exclude (everything else runs)
+exclude-id:
   - txt-fingerprint
   - wildcard-tls
   - ssl-dns-names

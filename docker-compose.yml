@@ -55,6 +55,6 @@ services:
       - ./data/nuclei:/output
       - ./nuclei-targets.txt:/targets.txt:ro
       - ./nuclei-config.yaml:/root/.config/nuclei/config.yaml:ro
-    command: ["-l", "/targets.txt", "-update-templates"]
+    command: ["-l", "/targets.txt"]
     profiles:
       - nuclei

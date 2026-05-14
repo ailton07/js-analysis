@@ -195,7 +195,11 @@ docker compose --profile nuclei run --rm nuclei
 
 gluetun must be running (or will be started automatically since nuclei depends on it).
 
-On the first run, nuclei downloads its template database. Subsequent runs reuse the cached templates unless `-update-templates` triggers an update.
+On the first run, nuclei downloads its template database automatically. To update templates explicitly:
+
+```bash
+docker compose --profile nuclei run --rm nuclei -update-templates
+```
 
 ### Output
 
@@ -209,8 +213,8 @@ Results are written to `data/nuclei/` on the host (created automatically on firs
 ### Configuration (`nuclei-config.yaml`)
 
 ```yaml
-# Template IDs to run (use exclude-id: to invert)
-id:
+# Runs ALL templates except the ones listed under exclude-id
+exclude-id:
   - tech-detect
   - waf-detect
   - cors-misconfig
@@ -226,9 +230,7 @@ output: /output/results.txt
 json-export: /output/results.json
 ```
 
-To switch from **include** to **exclude** the listed template IDs, change `id:` to `exclude-id:`.
-
-To run all templates instead of a specific set, remove the `id:` block entirely.
+To run only a specific set of templates instead of all, replace `exclude-id:` with `id:`.
 
 ---
 

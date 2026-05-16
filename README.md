@@ -190,10 +190,27 @@ The nuclei service runs independently from the JS analysis pipeline. It uses the
 ### Run
 
 ```bash
+# Run in the foreground (blocks the terminal)
 docker compose --profile nuclei run --rm nuclei
+
+# Run in the background
+docker compose --profile nuclei run --rm -d nuclei
 ```
 
 gluetun must be running (or will be started automatically since nuclei depends on it).
+
+Before scanning starts, the VPN connection is verified against `am.i.mullvad.net`. The scan aborts if the exit IP is not a Mullvad node:
+
+```
+[*] Verifying VPN connection...
+[+] VPN OK  193.32.127.x  (Amsterdam, Netherlands)
+```
+
+Follow progress or check results when running in the background:
+
+```bash
+docker logs -f nuclei
+```
 
 On the first run, nuclei downloads its template database automatically. To update templates explicitly:
 

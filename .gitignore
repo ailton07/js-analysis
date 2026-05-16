@@ -10,3 +10,4 @@ __pycache__/
 .DS_Store
 targets/*.yaml
 !targets/example-target.yaml
+nuclei-targets.txt

@@ -55,6 +55,8 @@ services:
       - ./data/nuclei:/output
       - ./nuclei-targets.txt:/targets.txt:ro
       - ./nuclei-config.yaml:/root/.config/nuclei/config.yaml:ro
+      - ./scripts/run_nuclei.sh:/run_nuclei.sh:ro
+    entrypoint: ["/bin/sh", "/run_nuclei.sh"]
     command: ["-l", "/targets.txt"]
     profiles:
       - nuclei

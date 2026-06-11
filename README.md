@@ -151,8 +151,27 @@ The scheduler registers cron jobs for every enabled target with a `schedule` fie
 
 ### Manually enqueue a job
 
+Pushes a job into the SQLite queue without waiting for the scheduler's cron trigger. The running `js-worker` container picks it up immediately on its next poll cycle.
+
 ```bash
 bash scripts/run_worker.sh enqueue example.com targets/myprogram.yaml
+```
+
+- `example.com` — the domain to scan (must match the `domain` field in the target YAML)
+- `targets/myprogram.yaml` — path to the target config file (relative to the project root)
+
+On success:
+
+```
+Job 7 enqueued for example.com
+```
+
+The `js-worker` container must already be running (`docker compose up -d`) for the job to be picked up. If the worker is not running, the job stays in the queue and will be processed the next time the worker starts.
+
+To enqueue a job and run it immediately in one step (no persistent worker needed):
+
+```bash
+bash scripts/run_worker.sh run targets/myprogram.yaml
 ```
 
 ### View live logs

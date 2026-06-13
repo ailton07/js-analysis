@@ -24,6 +24,39 @@ def run(target: str) -> None:
     run_pipeline(target)
 
 
+@cli.command("collect-urls")
+@click.argument("target", type=click.Path(exists=True))
+@click.option("--output-dir", default=None, help="Directory to write the waymore output file (default: data/tmp).")
+def collect_urls(target: str, output_dir: str | None) -> None:
+    """Run only the waymore URL collection for a TARGET yaml file and save the output."""
+    import yaml
+    from pathlib import Path as _Path
+    from collectors import waymore
+    from pipeline import _check_vpn, load_global_config
+
+    global_cfg = load_global_config()
+    target_cfg = yaml.safe_load(_Path(target).read_text())
+
+    if not target_cfg.get("enabled", True):
+        raise SystemExit(f"Target '{target}' is disabled (enabled: false).")
+
+    _check_vpn()
+
+    domain = target_cfg["domain"]
+    data_dir = _Path(output_dir) if output_dir else _Path(global_cfg.get("data_dir", "data")) / "tmp"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    console.rule(f"[bold cyan]{domain} — waymore URL collection")
+    try:
+        urls = waymore.collect(domain, data_dir)
+    except RuntimeError as e:
+        raise SystemExit(f"waymore failed: {e}")
+
+    output_file = data_dir / f"waymore_{domain}.txt"
+    console.print(f"  [green]{len(urls)}[/green] JS URLs collected")
+    console.print(f"  output : {output_file}")
+
+
 @cli.command()
 def worker() -> None:
     """Start the job worker (polls the queue and runs pipelines)."""

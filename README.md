@@ -111,6 +111,16 @@ docker compose up -d
 
 ## Usage
 
+### Waymore-only URL collection
+
+Runs only the waymore step and writes the URL list to `data/tmp/waymore_<domain>.txt`, skipping fetching, normalizing, and scanning:
+
+```bash
+bash scripts/run_worker.sh collect-urls targets/myprogram.yaml
+```
+
+Pass `--output-dir <path>` to write the file to a custom directory instead of `data/tmp`.
+
 ### One-shot scan (run once, no schedule)
 
 Set `schedule: ~` in the target YAML, then run:

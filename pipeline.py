@@ -1,3 +1,4 @@
+import json
 import shutil
 from pathlib import Path
 
@@ -171,6 +172,14 @@ def run_pipeline(target_config_path: str) -> None:
         url_map[f["hash"]] = f["url"]
         for sm in f.get("sourcemap_files", []):
             url_map[sm["hash"]] = sm["url"]
+
+    url_map_path = data_dir / domain / "url_map.json"
+    existing_url_map: dict[str, str] = {}
+    if url_map_path.exists():
+        existing_url_map = json.loads(url_map_path.read_text())
+    existing_url_map.update(url_map)
+    url_map_path.write_text(json.dumps(existing_url_map, indent=2, sort_keys=True))
+    console.print(f"  url map : {url_map_path} ({len(existing_url_map)} entries)")
 
     # ── 5. Scan ───────────────────────────────────────────────────────────────
     console.print("[yellow]Scanning...")

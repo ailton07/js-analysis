@@ -32,7 +32,8 @@ def collect_urls(target: str, output_dir: str | None) -> None:
     import yaml
     from pathlib import Path as _Path
     from collectors import waymore
-    from pipeline import _check_vpn, load_global_config
+    from netcheck import check_vpn
+    from pipeline import load_global_config
 
     global_cfg = load_global_config()
     target_cfg = yaml.safe_load(_Path(target).read_text())
@@ -40,7 +41,7 @@ def collect_urls(target: str, output_dir: str | None) -> None:
     if not target_cfg.get("enabled", True):
         raise SystemExit(f"Target '{target}' is disabled (enabled: false).")
 
-    _check_vpn()
+    check_vpn()
 
     domain = target_cfg["domain"]
     data_dir = _Path(output_dir) if output_dir else _Path(global_cfg.get("data_dir", "data")) / "tmp"
@@ -55,6 +56,15 @@ def collect_urls(target: str, output_dir: str | None) -> None:
     output_file = data_dir / f"waymore_{domain}.txt"
     console.print(f"  [green]{len(urls)}[/green] JS URLs collected")
     console.print(f"  output : {output_file}")
+
+
+@cli.command()
+@click.argument("target", type=click.Path(exists=True))
+def subenum(target: str) -> None:
+    """Run passive subdomain enumeration for a single subdomain-targets TARGET yaml file."""
+    from subenum.pipeline import run_subenum
+
+    run_subenum(target)
 
 
 @cli.command()
@@ -133,6 +143,10 @@ def test_tools() -> None:
         ("gitleaks",    ["gitleaks", "version"]),
         ("trufflehog",  ["trufflehog", "--version"]),
         ("waymore",     ["waymore", "--version"]),
+        ("subfinder",   ["subfinder", "-version"]),
+        ("dnsx",        ["dnsx", "-version"]),
+        ("tlsx",        ["tlsx", "-version"]),
+        ("httpx",       ["httpx", "-version"]),
     ]
 
     for name, cmd in checks:

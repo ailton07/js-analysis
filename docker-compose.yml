@@ -60,3 +60,18 @@ services:
     command: ["-l", "/targets.txt"]
     profiles:
       - nuclei
+
+  subdomains:
+    build: .
+    container_name: js-subdomains
+    network_mode: "service:gluetun"
+    depends_on:
+      - gluetun
+    volumes:
+      - ./data:/app/data
+      - ./subdomain-targets:/app/subdomain-targets
+      - ./subenum-config.yaml:/app/subenum-config.yaml:ro
+      - ./notify-config.yaml:/root/.config/notify/provider-config.yaml:ro
+    entrypoint: ["python", "main.py", "subenum"]
+    profiles:
+      - subdomains

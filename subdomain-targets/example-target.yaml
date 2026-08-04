@@ -1,0 +1,19 @@
+enabled: false   # template only — copy this file and set enabled: true
+
+domain: example.com
+program: "HackerOne - Example Program"
+
+# Scope filters applied to discovered hosts (substring match)
+scope:
+  - "example.com"
+
+# Hosts containing any of these strings are skipped
+exclude:
+  - "cdn.example.com"
+  - "static.third-party.com"
+
+# Send new + live subdomains to notify (requires notify-config.yaml to be mounted)
+notify: true
+
+# Send progress through notify at each stage (passive / resolve / probe / done)
+verbose: false

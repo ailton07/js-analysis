@@ -10,6 +10,10 @@ def notify(finding: dict) -> None:
     _send(_format(finding))
 
 
+def notify_subdomain(sub: dict) -> None:
+    _send(_format_subdomain(sub))
+
+
 def _send(text: str) -> None:
     try:
         subprocess.run(
@@ -44,3 +48,14 @@ def _format(finding: dict) -> str:
         f"Secret:  {preview}\n"
         f"Entropy: {finding.get('entropy', 0):.2f}"
     )
+
+
+def _format_subdomain(sub: dict) -> str:
+    lines = [
+        f"[NEW SUBDOMAIN] {sub.get('subdomain', 'unknown')}",
+        f"IP:     {sub.get('resolved_ip') or 'unresolved'}",
+        f"HTTP:   {sub.get('http_status') or '-'}  {sub.get('title') or ''}",
+    ]
+    if sub.get("tech"):
+        lines.append(f"Tech:   {sub['tech']}")
+    return "\n".join(lines)

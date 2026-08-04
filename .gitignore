@@ -11,3 +11,5 @@ __pycache__/
 targets/*.yaml
 !targets/example-target.yaml
 nuclei-targets.txt
+subdomain-targets/*.yaml
+!subdomain-targets/example-target.yaml

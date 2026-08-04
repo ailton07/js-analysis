@@ -1,9 +1,10 @@
 # js-analysis
 
-A self-hosted toolkit for bug bounty reconnaissance. Includes two independent features, both routing all traffic through a Mullvad WireGuard VPN:
+A self-hosted toolkit for bug bounty reconnaissance. Includes three independent features, all routing traffic through a Mullvad WireGuard VPN:
 
 - **JS analysis pipeline** — collects JavaScript files from bug bounty targets, normalizes them, and scans for secrets using gitleaks and trufflehog
 - **Nuclei scanner** — runs targeted nuclei templates against a custom list of URLs, fully isolated from the JS pipeline
+- **Subdomain enumeration** — passive-only subdomain discovery (subfinder + dnsx + tlsx + httpx), fully isolated from the other two. Deliberately has no brute-force/permutation stage — see [Subdomain enumeration](#subdomain-enumeration) for why.
 
 Findings and notifications are sent to Discord, Slack, or Telegram via [projectdiscovery/notify](https://github.com/projectdiscovery/notify).
 
@@ -91,7 +92,7 @@ Full list of supported providers: [notify documentation](https://github.com/proj
 cp targets/example-target.yaml targets/myprogram.yaml
 ```
 
-Set `enabled: true` and fill in the domain, scope, and schedule. See [Target configuration](#target-configuration) below.
+Set `enabled: true` and fill in the domain, scope, and schedule. See [Target configuration](#target-configuration-targetsyaml) below.
 
 ### 4. Build and start
 
@@ -106,6 +107,7 @@ docker compose up -d
 | `js-worker` | Polls the job queue and runs pipelines |
 | `js-scheduler` | Reads target files and enqueues jobs on their cron schedules |
 | `nuclei` | Nuclei scanner — not started by `docker compose up`, invoke explicitly (see [Nuclei](#nuclei)) |
+| `subdomains` | Passive subdomain enumeration — not started by `docker compose up`, invoke explicitly (see [Subdomain enumeration](#subdomain-enumeration)) |
 
 ---
 
@@ -280,6 +282,58 @@ To run only a specific set of templates instead of all, replace `exclude-id:` wi
 
 ---
 
+## Subdomain enumeration
+
+The subdomain service runs independently from the JS analysis pipeline and nuclei. It uses the same Mullvad VPN tunnel (`gluetun`) but has its own image entrypoint, config, and target files. It is excluded from `docker compose up` by default — you invoke it explicitly.
+
+**Passive-only, by design.** It runs subfinder (CT logs/crt.sh + free sources) plus one-shot-per-host validation (dnsx resolve, tlsx SAN follow-up, httpx live-probe) — no DNS wordlist brute-forcing and no permutation/mutation stage. Those active techniques need to send large, sustained volumes of DNS queries to be effective, and even tunneled through Mullvad that traffic still physically rides your residential upstream/downstream (a VPN tunnel masks the *exit IP*, not the *bytes on your own line*). Running that safely means offloading the compute to a host that doesn't share your home connection — a remote VPS — which isn't available in this setup, so the active stage is left out entirely rather than run locally. If a remote host becomes available later, it can be added as a separate opt-in "remote executor" without changing this feature.
+
+### Setup
+
+1. Copy the example target:
+   ```bash
+   cp subdomain-targets/example-target.yaml subdomain-targets/myprogram.yaml
+   ```
+   Set `enabled: true` and fill in `domain`, `scope`, `exclude`. Same shape and semantics as JS pipeline targets — see [Target configuration](#target-configuration-targetsyaml).
+2. Review `subenum-config.yaml` — toggle the `dnsx`/`tlsx`/`httpx` stages and notify behavior.
+
+### Run
+
+```bash
+docker compose --profile subdomains run --rm subdomains subdomain-targets/myprogram.yaml
+```
+
+gluetun must be running (or will be started automatically since `subdomains` depends on it). Before enumeration starts, the same VPN check used by the JS pipeline (`netcheck.check_vpn()`) verifies the exit IP against `am.i.mullvad.net` and aborts if it isn't a Mullvad node.
+
+Output example:
+
+```
+────────────── example.com — subdomain enumeration ──────────────
+Passive discovery...
+  subfinder :   142 hosts
+  in scope  :   138
+Resolving...
+  resolved  :   119
+TLS SAN scraping...
+  tlsx new  :     3 additional hosts
+Probing live hosts...
+  live      :    87
+Done — 122 subdomains (87 live, 6 new).
+```
+
+### Output
+
+| Location | Content |
+|----------|---------|
+| `data/subdomains/<domain>/all.txt` | Every resolved, in-scope subdomain |
+| `data/subdomains/<domain>/live.txt` | Subdomains that responded to an HTTP(S) probe |
+| `data/subdomains/<domain>/live.json` | Same as above, with resolved IP / status code / title / detected tech |
+| `data/findings.db` (`subdomains` table) | Incremental tracking — `first_seen`/`last_seen` per subdomain, so re-running a target only reports genuinely new hosts |
+
+New **and live** subdomains are sent through `notify` (same providers as JS pipeline findings) when the target's `notify: true` and `subenum-config.yaml`'s `notify.new_live_only: true` (the default).
+
+---
+
 ## Configuration
 
 ### `config.yaml` — global settings
@@ -321,6 +375,26 @@ scanners:
 - Lower `delay` + higher `max_concurrent` = faster but higher risk of rate limiting
 - `katana.js_crawl: false` disables headless crawling — much faster for non-SPA targets
 - Add types to `high_value_types` to always notify for them regardless of entropy
+
+---
+
+### `subenum-config.yaml` — subdomain enumeration settings
+
+```yaml
+data_dir: data
+
+resolve:
+  dnsx: true    # validate passively-discovered names, drop unresolved + wildcard responses
+  tlsx: true    # scrape TLS SAN/CN on resolved hosts for extra names CT logs missed
+
+probe:
+  httpx: true   # final live status/title/tech probe
+
+notify:
+  new_live_only: true   # only alert on subdomains that are new AND resolve/respond
+```
+
+Committed directly (no secrets), unlike `notify-config.yaml`/`waymore.yml`.
 
 ---
 
@@ -381,6 +455,36 @@ cp targets/example-target.yaml targets/program-b.yaml
 # set enabled: true in each, then restart the scheduler
 docker compose restart scheduler
 ```
+
+---
+
+### Subdomain target configuration (`subdomain-targets/*.yaml`)
+
+Same shape as `targets/*.yaml`, kept in a separate directory since this feature is fully independent — a target here is not shared with the JS pipeline or nuclei.
+
+```yaml
+enabled: true
+
+domain: example.com
+program: "HackerOne - Example Program"
+
+# Only keep discovered hosts containing at least one of these strings
+scope:
+  - "example.com"
+
+# Skip discovered hosts containing any of these strings
+exclude:
+  - "cdn.example.com"
+  - "static.third-party.com"
+
+# Send new + live subdomains through notify
+notify: true
+
+# Send progress through notify at each stage (passive / resolve / probe / done)
+verbose: false
+```
+
+There is no `schedule` field — this feature has no scheduler integration (invoked ad hoc, same as nuclei).
 
 ---
 
@@ -449,6 +553,19 @@ SELECT secret_type, value, entropy, url
 FROM findings
 WHERE entropy >= 4.0
 ORDER BY entropy DESC;
+
+# Subdomains discovered for a target, newest first
+SELECT s.subdomain, s.source, s.resolved_ip, s.alive, s.http_status, s.tech, s.first_seen
+FROM subdomains s
+JOIN targets t ON t.id = s.target_id
+WHERE t.domain = 'example.com'
+ORDER BY s.first_seen DESC;
+
+# Subdomains that only turned up via TLS SAN scraping (CT logs/subfinder missed them)
+SELECT s.subdomain, s.resolved_ip, s.alive, s.http_status
+FROM subdomains s
+JOIN targets t ON t.id = s.target_id
+WHERE t.domain = 'example.com' AND s.source = 'tlsx';
 ```
 
 gitleaks CSV reports are also written to `reports/gitleaks_<domain>.csv` for each run.
@@ -548,17 +665,26 @@ waymore queries Wayback Machine and Common Crawl, which can be slow. The collect
 3. Check that `notify: true` is set in the target YAML
 4. Check that findings exceed the threshold in `config.yaml` (`min_entropy_notify`, `high_value_types`)
 5. For progress messages, check that `verbose: true` is set in the target YAML
+6. For subdomain enumeration, `notify.new_live_only: true` (the default in `subenum-config.yaml`) only alerts on subdomains that are both new *and* live — set it to `false` to also alert on new-but-unresolved/dead ones
 
 ### Target is skipped by the scheduler
 
 - Check that `enabled: true` is set in the target YAML (`example-target.yaml` ships with `enabled: false`)
 - Check that `schedule` is set to a valid cron string — targets with `schedule: ~` are one-shot and never auto-enqueued
+- This only applies to `targets/*.yaml` — `subdomain-targets/*.yaml` has no `schedule` field and no scheduler integration; it's always invoked ad hoc (`enabled: true` is still required)
 
 ### Rescan a target from scratch
 
 ```bash
 sqlite3 data/findings.db \
   "DELETE FROM js_files WHERE target_id = (SELECT id FROM targets WHERE domain = 'example.com')"
+```
+
+For subdomain enumeration, clear the `subdomains` table instead so the next run reports every host as new again:
+
+```bash
+sqlite3 data/findings.db \
+  "DELETE FROM subdomains WHERE target_id = (SELECT id FROM targets WHERE domain = 'example.com')"
 ```
 
 ---
@@ -591,11 +717,13 @@ Scans are incremental: on repeat runs only new or changed JS files are processed
 ```
 js-analysis/
 ├── Dockerfile                      multi-stage: Go tools + Python 3.11 + chromium
-├── docker-compose.yml              gluetun (VPN) + worker + scheduler + nuclei
+├── docker-compose.yml              gluetun (VPN) + worker + scheduler + nuclei + subdomains
 ├── config.yaml                     JS pipeline global settings
 ├── nuclei-config.yaml              nuclei template IDs, rate limits, output paths
 ├── nuclei-targets.txt              one URL per line — input for the nuclei service
-├── pipeline.py                     core orchestration logic
+├── subenum-config.yaml             subdomain enumeration global settings
+├── pipeline.py                     JS pipeline orchestration logic
+├── netcheck.py                     shared Mullvad VPN gate (used by pipeline.py + subenum/pipeline.py)
 ├── scheduler.py                    APScheduler-based cron runner
 ├── main.py                         CLI entry point
 ├── scripts/
@@ -615,7 +743,14 @@ js-analysis/
 ├── scanners/
 │   ├── gitleaks_runner.py
 │   ├── trufflehog_runner.py
-│   └── notifier.py                 findings + progress via notify CLI
+│   └── notifier.py                 findings + subdomains + progress via notify CLI
+│
+├── subenum/                        passive subdomain enumeration (independent feature)
+│   ├── passive.py                  subfinder wrapper
+│   ├── resolve.py                  dnsx wrapper — resolve + wildcard filter
+│   ├── tls_scrape.py               tlsx wrapper — TLS SAN/CN follow-up
+│   ├── httpx_probe.py              httpx wrapper — final live-probe
+│   └── pipeline.py                 orchestration logic
 │
 ├── db/
 │   └── store.py                    SQLite adapter
@@ -624,7 +759,10 @@ js-analysis/
 │   ├── job_manager.py              queue operations
 │   └── worker.py                   polling worker loop
 │
-├── targets/                        one YAML per bug bounty target
+├── targets/                        one YAML per bug bounty target (JS pipeline)
+│   └── example-target.yaml         template (enabled: false — never executed)
+│
+├── subdomain-targets/              one YAML per target (subdomain enumeration)
 │   └── example-target.yaml         template (enabled: false — never executed)
 │
 └── data/                           created at runtime (gitignored)
@@ -634,7 +772,12 @@ js-analysis/
     ├── nuclei/                     nuclei results (created on first nuclei run)
     │   ├── results.txt
     │   └── results.json
-    └── findings.db                 SQLite database
+    ├── subdomains/                 subdomain enumeration results, one dir per domain
+    │   └── <domain>/
+    │       ├── all.txt
+    │       ├── live.txt
+    │       └── live.json
+    └── findings.db                 SQLite database (findings + subdomains tables)
 ```
 
 ---
@@ -656,6 +799,15 @@ js-analysis/
 | Tool | Version | Purpose |
 |------|---------|---------|
 | [nuclei](https://github.com/projectdiscovery/nuclei) | latest | Template-based vulnerability and fingerprint scanning |
+
+**Subdomain enumeration (built into the project image):**
+
+| Tool | Version | Purpose |
+|------|---------|---------|
+| [subfinder](https://github.com/projectdiscovery/subfinder) | latest | Passive subdomain discovery (CT logs/crt.sh + free sources) |
+| [dnsx](https://github.com/projectdiscovery/dnsx) | latest | Resolve discovered hosts, drop unresolved/wildcard responses |
+| [tlsx](https://github.com/projectdiscovery/tlsx) | latest | TLS SAN/CN scraping for extra hostnames CT logs missed |
+| [httpx](https://github.com/projectdiscovery/httpx) | latest | Final live-probe: status code, title, tech detection |
 
 **Infrastructure:**
 

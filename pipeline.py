@@ -2,13 +2,13 @@ import json
 import shutil
 from pathlib import Path
 
-import requests
 import yaml
 from rich.console import Console
 
 from collectors import katana, waymore
 from db import store
 from fetcher.downloader import fetch_all
+from netcheck import check_vpn
 from normalizer.js_normalizer import normalize
 from scanners import gitleaks_runner, notifier, trufflehog_runner
 
@@ -20,21 +20,6 @@ def load_global_config() -> dict:
     return yaml.safe_load(path.read_text()) if path.exists() else {}
 
 
-def _check_vpn() -> None:
-    """Abort if traffic is not exiting through a Mullvad node."""
-    try:
-        data = requests.get("https://am.i.mullvad.net/json", timeout=10).json()
-    except Exception as exc:
-        raise SystemExit(f"VPN check failed — could not reach am.i.mullvad.net: {exc}")
-    if not data.get("mullvad_exit_ip", False):
-        ip = data.get("ip", "unknown")
-        raise SystemExit(f"VPN check failed — exit IP {ip} is not a Mullvad node. Aborting.")
-    ip = data.get("ip", "?")
-    city = data.get("city", "?")
-    country = data.get("country", "?")
-    console.print(f"[green]VPN OK[/green]  {ip}  ({city}, {country})")
-
-
 def run_pipeline(target_config_path: str) -> None:
     global_cfg = load_global_config()
     target_cfg = yaml.safe_load(Path(target_config_path).read_text())
@@ -42,7 +27,7 @@ def run_pipeline(target_config_path: str) -> None:
     if not target_cfg.get("enabled", True):
         raise SystemExit(f"Target '{target_config_path}' is disabled (enabled: false). Copy it and set enabled: true.")
 
-    _check_vpn()
+    check_vpn()
 
     domain = target_cfg["domain"]
     program = target_cfg.get("program", domain)

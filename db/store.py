@@ -55,6 +55,22 @@ def init(db_path: Path) -> None:
                 finished_at   TEXT,
                 error         TEXT
             );
+
+            CREATE TABLE IF NOT EXISTS subdomains (
+                id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                target_id   INTEGER,
+                subdomain   TEXT NOT NULL,
+                source      TEXT,
+                resolved_ip TEXT,
+                alive       INTEGER DEFAULT 0,
+                http_status INTEGER,
+                title       TEXT,
+                tech        TEXT,
+                first_seen  TEXT DEFAULT (datetime('now')),
+                last_seen   TEXT DEFAULT (datetime('now')),
+                UNIQUE(target_id, subdomain),
+                FOREIGN KEY (target_id) REFERENCES targets(id)
+            );
         """)
 
 
@@ -134,6 +150,40 @@ def save_finding(finding: dict) -> bool:
                 (finding["file_hash"], finding["detector"], finding["value"]),
             )
             return False
+
+
+# Subdomains
+
+def save_subdomain(sub: dict) -> bool:
+    """Upserts a subdomain. Returns True if it is new."""
+    with _conn() as conn:
+        try:
+            conn.execute(
+                """INSERT INTO subdomains
+                   (target_id, subdomain, source, resolved_ip, alive, http_status, title, tech)
+                   VALUES (:target_id, :subdomain, :source, :resolved_ip,
+                           :alive, :http_status, :title, :tech)""",
+                sub,
+            )
+            return True
+        except sqlite3.IntegrityError:
+            conn.execute(
+                """UPDATE subdomains
+                   SET last_seen = datetime('now'), resolved_ip = :resolved_ip,
+                       alive = :alive, http_status = :http_status, title = :title, tech = :tech
+                   WHERE target_id = :target_id AND subdomain = :subdomain""",
+                sub,
+            )
+            return False
+
+
+def get_subdomains_for_target(target_id: int) -> list[dict]:
+    with _conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM subdomains WHERE target_id = ? ORDER BY subdomain",
+            (target_id,),
+        ).fetchall()
+        return [dict(row) for row in rows]
 
 
 # Jobs

@@ -1,0 +1,15 @@
+# Subdomain enumeration configuration
+# Passive-only by design — no brute-force/permutation stage.
+# See README.md "Subdomain enumeration" section for why.
+
+data_dir: data
+
+resolve:
+  dnsx: true    # validate passively-discovered names, drop unresolved + wildcard responses
+  tlsx: true    # scrape TLS SAN/CN on resolved hosts for extra names CT logs missed
+
+probe:
+  httpx: true   # final live status/title/tech probe
+
+notify:
+  new_live_only: true   # only alert on subdomains that are new AND resolve/respond

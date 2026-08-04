@@ -74,7 +74,7 @@ def run_pipeline(target_config_path: str) -> None:
     urls: set[str] = set()
 
     try:
-        w_urls = waymore.collect(domain, tmp_dir)
+        w_urls = waymore.collect(domain, tmp_dir, scope=target_cfg.get("scope", []))
         console.print(f"  waymore : {len(w_urls):>5} URLs")
         urls.update(w_urls)
     except RuntimeError as e:

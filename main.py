@@ -48,7 +48,7 @@ def collect_urls(target: str, output_dir: str | None) -> None:
 
     console.rule(f"[bold cyan]{domain} — waymore URL collection")
     try:
-        urls = waymore.collect(domain, data_dir)
+        urls = waymore.collect(domain, data_dir, scope=target_cfg.get("scope", []))
     except RuntimeError as e:
         raise SystemExit(f"waymore failed: {e}")
 

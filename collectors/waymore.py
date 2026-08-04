@@ -10,13 +10,27 @@ _STATIC_RE = re.compile(
 )
 
 
-def collect(domain: str, output_dir: Path, timeout: int = 600) -> list[str]:
+def collect(
+    domain: str, output_dir: Path, timeout: int = 600, scope: list[str] | None = None
+) -> list[str]:
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"waymore_{domain}.txt"
 
+    # waymore's -i accepts a single domain OR a file listing multiple domains
+    # (one per line), merging results into the same -oU output file. Use the
+    # latter when scope has more than just the primary domain, so URLs are
+    # collected for every in-scope domain, not just `domain`.
+    domains = scope or [domain]
+    if len(domains) > 1:
+        domains_file = output_dir / f"waymore_{domain}_domains.txt"
+        domains_file.write_text("\n".join(domains) + "\n")
+        input_arg = str(domains_file)
+    else:
+        input_arg = domain
+
     try:
         subprocess.run(
-            ["waymore", "-i", domain, "-mode", "U", "-oU", str(output_file)],
+            ["waymore", "-i", input_arg, "-mode", "U", "-oU", str(output_file)],
             timeout=timeout,
             capture_output=True,
             check=False,

@@ -4,7 +4,7 @@ import subprocess
 import tempfile
 
 
-def resolve(hosts: list[str], domain: str, timeout: int = 300) -> list[dict]:
+def resolve(hosts: list[str], timeout: int = 300) -> list[dict]:
     """Resolve hosts to IPs via dnsx, dropping unresolved and wildcard-flagged entries."""
     if not hosts:
         return []
@@ -13,17 +13,20 @@ def resolve(hosts: list[str], domain: str, timeout: int = 300) -> list[dict]:
     try:
         list_file.write("\n".join(hosts))
         list_file.close()
-        return _run(list_file.name, domain, timeout)
+        return _run(list_file.name, timeout)
     finally:
         os.unlink(list_file.name)
 
 
-def _run(list_path: str, domain: str, timeout: int) -> list[dict]:
+def _run(list_path: str, timeout: int) -> list[dict]:
+    # -wd (manual wildcard-domain) is broken in dnsx 1.2.3: it drops every
+    # result, including verified non-wildcard resolutions. -auto-wildcard
+    # detects wildcards per-domain from the input itself and works correctly.
     cmd = [
         "dnsx",
         "-l", list_path,
         "-a", "-resp",
-        "-wd", domain,
+        "-auto-wildcard",
         "-json",
         "-silent",
     ]

@@ -61,7 +61,7 @@ def run_subenum(target_config_path: str) -> None:
     # ── 1. Passive discovery ────────────────────────────────────────────────
     console.print("[yellow]Passive discovery...")
     try:
-        hosts = set(passive.collect(domain))
+        hosts = set(passive.collect(domain, scope=target_cfg.get("scope", [])))
     except RuntimeError as e:
         raise SystemExit(f"subfinder failed: {e}")
     console.print(f"  subfinder : {len(hosts):>5} hosts")
@@ -77,7 +77,7 @@ def run_subenum(target_config_path: str) -> None:
     if resolve_cfg.get("dnsx", True) and hosts:
         console.print("[yellow]Resolving...")
         try:
-            for r in resolve.resolve(sorted(hosts), domain):
+            for r in resolve.resolve(sorted(hosts)):
                 resolved[r["subdomain"]] = {**r, "source": "passive"}
             console.print(f"  resolved  : {len(resolved):>5}")
         except RuntimeError as e:
@@ -94,7 +94,7 @@ def run_subenum(target_config_path: str) -> None:
             new_hosts = _apply_scope(new_hosts, target_cfg)
             if new_hosts:
                 console.print(f"  tlsx new  : {len(new_hosts):>5} additional hosts")
-                for r in resolve.resolve(sorted(new_hosts), domain):
+                for r in resolve.resolve(sorted(new_hosts)):
                     resolved[r["subdomain"]] = {**r, "source": "tlsx"}
         except RuntimeError as e:
             console.print(f"  [red]tlsx skipped: {e}")

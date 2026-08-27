@@ -52,7 +52,7 @@ def _run(
         "-l", list_path,
         "-mc", "200,301,302,403",
         "-timeout", str(probe_timeout),
-        "-c", str(concurrency),
+        "-t", str(concurrency),
         "-silent",
     ]
     try:
@@ -66,6 +66,14 @@ def _run(
         )
     except subprocess.TimeoutExpired:
         return None
+
+    if result.returncode != 0:
+        # A CLI error here (bad flag, incompatible httpx version, crash) still
+        # prints to stdout with a nonzero exit — never let that be silently
+        # parsed as "zero hosts are live". Raise so the caller falls back to
+        # the unfiltered list instead of nuking every URL.
+        detail = (result.stderr or result.stdout).strip().splitlines()[:1]
+        raise RuntimeError(f"httpx exited {result.returncode}: {detail[0] if detail else 'no output'}")
 
     live = set()
     for line in result.stdout.splitlines():

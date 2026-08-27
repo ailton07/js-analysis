@@ -77,12 +77,15 @@ def run_pipeline(target_config_path: str) -> None:
         ) or [f"https://{domain}"]
         seed_total = len(k_seeds)
         if l_cfg.get("enabled", True):
-            k_seeds = liveness.filter_live(
-                k_seeds,
-                concurrency=l_cfg.get("concurrency", 50),
-                probe_timeout=l_cfg.get("timeout", 5),
-            )
-            console.print(f"  katana seeds: {len(k_seeds)}/{seed_total} live")
+            try:
+                k_seeds = liveness.filter_live(
+                    k_seeds,
+                    concurrency=l_cfg.get("concurrency", 50),
+                    probe_timeout=l_cfg.get("timeout", 5),
+                )
+                console.print(f"  katana seeds: {len(k_seeds)}/{seed_total} live")
+            except RuntimeError as e:
+                console.print(f"  [red]liveness filter skipped: {e}")
         else:
             console.print(f"  katana seeds: {seed_total} (from waymore + fallback root)")
         k_urls = katana.collect(

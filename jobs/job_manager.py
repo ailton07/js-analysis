@@ -1,8 +1,17 @@
+from pathlib import Path
+
 from db import store
+
+_TARGETS_DIR = Path("targets")
 
 
 def enqueue(target_domain: str, config_path: str) -> int:
-    return store.enqueue_job(target_domain, config_path)
+    # The worker/scheduler containers only ever see targets/ (mounted at
+    # /app/targets), never the host filesystem — store a targets/-relative
+    # path regardless of what was passed in, so a job enqueued from the host
+    # with an absolute host path still resolves inside the worker container.
+    normalized_path = str(_TARGETS_DIR / Path(config_path).name)
+    return store.enqueue_job(target_domain, normalized_path)
 
 
 def next_job() -> dict | None:

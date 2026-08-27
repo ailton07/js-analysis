@@ -5,7 +5,7 @@ from pathlib import Path
 import yaml
 from rich.console import Console
 
-from collectors import katana, waymore
+from collectors import katana, liveness, waymore
 from db import store
 from fetcher.downloader import fetch_all
 from netcheck import check_vpn
@@ -65,12 +65,26 @@ def run_pipeline(target_config_path: str) -> None:
     except RuntimeError as e:
         console.print(f"  [red]waymore skipped: {e}")
 
+    l_cfg = global_cfg.get("collectors", {}).get("liveness", {})
+
     try:
         k_cfg = global_cfg.get("collectors", {}).get("katana", {})
+        if not k_cfg.get("enabled", True):
+            raise RuntimeError("disabled via config (collectors.katana.enabled: false)")
+
         k_seeds = waymore.collect_seeds(
             domain, tmp_dir, max_seeds=k_cfg.get("max_seeds", 300)
         ) or [f"https://{domain}"]
-        console.print(f"  katana seeds: {len(k_seeds)} (from waymore + fallback root)")
+        seed_total = len(k_seeds)
+        if l_cfg.get("enabled", True):
+            k_seeds = liveness.filter_live(
+                k_seeds,
+                concurrency=l_cfg.get("concurrency", 50),
+                probe_timeout=l_cfg.get("timeout", 5),
+            )
+            console.print(f"  katana seeds: {len(k_seeds)}/{seed_total} live")
+        else:
+            console.print(f"  katana seeds: {seed_total} (from waymore + fallback root)")
         k_urls = katana.collect(
             k_seeds,
             depth=target_cfg.get("crawl_depth", k_cfg.get("depth", 2)),
@@ -93,6 +107,19 @@ def run_pipeline(target_config_path: str) -> None:
 
     url_list = list(urls)[: target_cfg.get("max_urls", 5000)]
     console.print(f"  total   : {len(url_list):>5} (after dedup / filters)")
+
+    if l_cfg.get("enabled", True) and url_list:
+        try:
+            before = len(url_list)
+            url_list = liveness.filter_live(
+                url_list,
+                concurrency=l_cfg.get("concurrency", 50),
+                probe_timeout=l_cfg.get("timeout", 5),
+            )
+            console.print(f"  live    : {len(url_list):>5}/{before} (dead hosts dropped)")
+        except RuntimeError as e:
+            console.print(f"  [red]liveness filter skipped: {e}")
+
     vprogress(f"[{domain}] collected {len(url_list)} JS URLs")
 
     # ── 2. Fetch ─────────────────────────────────────────────────────────────

@@ -645,6 +645,20 @@ Common causes:
 - Invalid `MULLVAD_WG_ADDR` — must be the IPv4 address (`10.x.x.x/32`) from the WireGuard config, not the IPv6
 - `SERVER_COUNTRIES` value doesn't match a Mullvad country — try `Netherlands` or `United States`
 
+### gluetun connects but everything through it hangs (dnsx resolves 0, VPN check times out)
+
+Symptom: `docker compose logs gluetun` shows the WireGuard handshake completing normally ("wireguard setup is complete"), `dnsx`/`subfinder` may work briefly then stop, and any HTTPS request through the tunnel (including gluetun's own VPN check, blocklist download, and leak check) hangs until it times out — usually at the TLS handshake stage rather than failing outright. `docker compose run --rm subdomains ...` reports `VPN check failed — could not reach am.i.mullvad.net`.
+
+This is **not** a Mullvad account/key/server problem if all of the following check out:
+- Account subscription is active and the device is still listed at [mullvad.net/account](https://mullvad.net/account)
+- The key in `.env` matches what a freshly downloaded config bundle contains (Mullvad's config generator reuses your existing device key rather than issuing a new one, unless you explicitly regenerate it)
+- The failure is identical across multiple `SERVER_COUNTRIES` values (try at least two, e.g. `Netherlands` and a country close to you)
+- A full Docker Desktop restart (not just `docker compose restart gluetun`) doesn't change anything
+- Forcing `WIREGUARD_IMPLEMENTATION=userspace` (instead of the default `auto`, which prefers a kernel WireGuard module) doesn't change anything
+- A plain container with **no VPN at all** (`docker run --rm python:3.12-slim python3 -c "..."` hitting `https://am.i.mullvad.net/json`) succeeds quickly — proving the host's own network/ISP is fine
+
+If all of that holds, the problem is local to how your network handles the WireGuard UDP tunnel specifically — most likely your router's NAT/conntrack handling of the encapsulated UDP flow, or ISP-side UDP shaping/throttling, rather than anything Docker, gluetun, or Mullvad-side. Confirmed fix in one case: tethering to a phone hotspot instead of the home network made the tunnel work immediately. If you hit this, the fastest diagnostic is the same — try a different network before touching VPN config.
+
 ### katana finds no URLs
 
 - Check `js_crawl: true` — headless crawling requires chromium (included in the image)

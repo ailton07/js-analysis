@@ -28,11 +28,13 @@ _USER_AGENTS = [
 ]
 
 
-def _make_session(timeout: int) -> requests.Session:
+def _make_session(connect_timeout: float, read_timeout: float) -> requests.Session:
     session = requests.Session()
     retry = Retry(
-        total=3,
-        backoff_factor=1,
+        total=1,
+        connect=1,
+        read=1,
+        backoff_factor=0.3,
         status_forcelist=[429, 500, 502, 503, 504],
         allowed_methods=["GET"],
     )
@@ -40,7 +42,10 @@ def _make_session(timeout: int) -> requests.Session:
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     session.headers["User-Agent"] = random.choice(_USER_AGENTS)
-    session.timeout = timeout
+    # (connect, read) tuple — the connect phase must never inherit the read
+    # budget, or a dead host stuck in SYN_SENT holds a thread for the full
+    # read timeout instead of failing fast.
+    session.timeout = (connect_timeout, read_timeout)
     return session
 
 
@@ -144,14 +149,15 @@ def fetch_all(
     on_progress: Callable[[int, int], None] | None = None,
 ) -> list[dict]:
     cfg = config.get("fetcher", {})
-    delay = cfg.get("delay", 1.5)
-    jitter = cfg.get("jitter", 0.5)
-    max_concurrent = cfg.get("max_concurrent", 3)
-    timeout = cfg.get("timeout", 15)
+    delay = cfg.get("delay", 0.3)
+    jitter = cfg.get("jitter", 0.2)
+    max_concurrent = cfg.get("max_concurrent", 12)
+    connect_timeout = cfg.get("connect_timeout", 5)
+    timeout = cfg.get("timeout", 8)
     max_bytes = int(cfg.get("max_content_mb", 10) * 1024 * 1024)
 
     raw_dir.mkdir(parents=True, exist_ok=True)
-    session = _make_session(timeout)
+    session = _make_session(connect_timeout, timeout)
     total = len(urls)
 
     results = []

@@ -13,3 +13,4 @@ targets/*.yaml
 nuclei-targets.txt
 subdomain-targets/*.yaml
 !subdomain-targets/example-target.yaml
+.env.bak

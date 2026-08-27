@@ -2,10 +2,13 @@ data_dir: data
 reports_dir: reports
 
 fetcher:
-  delay: 1.5          # seconds between requests
-  jitter: 0.5         # random ± added to delay
-  max_concurrent: 3
-  timeout: 15
+  delay: 0.3           # seconds between requests
+  jitter: 0.2          # random ± added to delay
+  max_concurrent: 12
+  timeout: 8           # read timeout (seconds)
+  connect_timeout: 5   # connect timeout (seconds) — kept separate from read so a
+                        # dead/unreachable host (SYN_SENT) fails fast instead of
+                        # eating the full read budget
   max_content_mb: 10
   valid_content_types:
     - application/javascript
@@ -14,7 +17,12 @@ fetcher:
     - text/plain
 
 collectors:
+  liveness:
+    enabled: true     # httpx pre-filter: drop dead hosts before katana + fetch
+    concurrency: 50
+    timeout: 5        # per-host probe timeout (seconds)
   katana:
+    enabled: true     # set false to skip katana entirely (e.g. waymore alone is enough)
     depth: 2
     timeout: 300      # max seconds katana is allowed to run
     js_crawl: true    # requires chromium; set false to disable headless crawling

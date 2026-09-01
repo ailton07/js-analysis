@@ -1,7 +1,12 @@
 import os
 import subprocess
 import tempfile
+import time
 from urllib.parse import urlparse
+
+# Above this many unique hosts, a batch is the full waymore URL list, not
+# katana's seed set — see the retry note in filter_live below.
+_SEED_RETRY_THRESHOLD = 50
 
 
 def filter_live(
@@ -34,7 +39,26 @@ def filter_live(
     try:
         list_file.write("\n".join(hosts_to_urls))
         list_file.close()
+
         live_hosts = _run(list_file.name, timeout, concurrency, probe_timeout)
+
+        # A small batch (katana seeds) coming back with zero live hosts is
+        # often a transient hiccup — a WAF/CF challenge on the probe request,
+        # a cold DNS cache — rather than every host actually being dead, so
+        # it's worth a couple of short retries. Skip this for the full
+        # waymore URL list: retrying thousands of URLs 2-3x over would
+        # multiply outbound requests against those hosts and risks tripping
+        # the target's own rate limiting / WAF.
+        retries = 0
+        while (
+            live_hosts is not None
+            and not live_hosts
+            and len(hosts_to_urls) <= _SEED_RETRY_THRESHOLD
+            and retries < 2
+        ):
+            time.sleep(3)
+            live_hosts = _run(list_file.name, timeout, concurrency, probe_timeout)
+            retries += 1
     finally:
         os.unlink(list_file.name)
 
@@ -54,6 +78,7 @@ def _run(
         "-timeout", str(probe_timeout),
         "-t", str(concurrency),
         "-silent",
+        "-no-color",
     ]
     try:
         result = subprocess.run(

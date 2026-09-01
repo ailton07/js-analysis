@@ -4,8 +4,12 @@ import subprocess
 import tempfile
 
 
-def resolve(hosts: list[str], timeout: int = 300) -> list[dict]:
-    """Resolve hosts to IPs via dnsx, dropping unresolved and wildcard-flagged entries."""
+def resolve(hosts: list[str], timeout: int = 900) -> list[dict]:
+    """Resolve hosts to IPs via dnsx, dropping unresolved and wildcard-flagged entries.
+
+    Default bumped from 300s to match passive.collect — a large multi-apex
+    scope means more hosts here too, and dnsx needs the same headroom.
+    """
     if not hosts:
         return []
 

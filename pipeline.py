@@ -59,7 +59,10 @@ def run_pipeline(target_config_path: str) -> None:
     urls: set[str] = set()
 
     try:
-        w_urls = waymore.collect(domain, tmp_dir, scope=target_cfg.get("scope", []))
+        w_cfg = global_cfg.get("collectors", {}).get("waymore", {})
+        w_urls = waymore.collect(
+            domain, tmp_dir, scope=target_cfg.get("scope", []), mode=w_cfg.get("mode", "U")
+        )
         console.print(f"  waymore : {len(w_urls):>5} URLs")
         urls.update(w_urls)
     except RuntimeError as e:
@@ -94,6 +97,8 @@ def run_pipeline(target_config_path: str) -> None:
             js_crawl=k_cfg.get("js_crawl", True),
             timeout=k_cfg.get("timeout", 300),
             proxy=global_cfg.get("proxy"),
+            concurrency=k_cfg.get("concurrency", 10),
+            parallelism=k_cfg.get("parallelism", 10),
         )
         console.print(f"  katana  : {len(k_urls):>5} URLs")
         urls.update(k_urls)

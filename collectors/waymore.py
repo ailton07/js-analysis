@@ -9,10 +9,23 @@ _STATIC_RE = re.compile(
     re.IGNORECASE,
 )
 
+# waymore's own -mode argparse choices — U (URLs only), R (download archived
+# responses only), B (both). Validate before shelling out: an invalid value
+# makes waymore's argparse reject the call outright (nonzero exit, no output
+# file), which previously read as "0 URLs" with no indication why.
+_VALID_MODES = {"U", "R", "B"}
+
 
 def collect(
-    domain: str, output_dir: Path, timeout: int = 600, scope: list[str] | None = None
+    domain: str,
+    output_dir: Path,
+    timeout: int = 600,
+    scope: list[str] | None = None,
+    mode: str = "U",
 ) -> list[str]:
+    if mode not in _VALID_MODES:
+        raise RuntimeError(f"invalid waymore mode '{mode}' — must be one of {sorted(_VALID_MODES)}")
+
     output_dir.mkdir(parents=True, exist_ok=True)
     output_file = output_dir / f"waymore_{domain}.txt"
 
@@ -28,17 +41,23 @@ def collect(
     else:
         input_arg = domain
 
+    result = None
     try:
-        subprocess.run(
-            ["waymore", "-i", input_arg, "-mode", "U", "-oU", str(output_file)],
+        result = subprocess.run(
+            ["waymore", "-i", input_arg, "-mode", mode, "-oU", str(output_file)],
             timeout=timeout,
             capture_output=True,
+            text=True,
             check=False,
         )
     except FileNotFoundError:
         raise RuntimeError("waymore not found — install with: pip install waymore")
     except subprocess.TimeoutExpired:
         pass  # partial results are still useful
+
+    if result is not None and result.returncode != 0 and not output_file.exists():
+        detail = (result.stderr or result.stdout or "").strip().splitlines()
+        raise RuntimeError(f"waymore exited {result.returncode}: {detail[0] if detail else 'no output'}")
 
     if not output_file.exists():
         return []

@@ -2,22 +2,50 @@ import os
 import subprocess
 import tempfile
 
+# Common two-label public suffixes — without these, the naive "last two
+# labels" apex heuristic below would truncate e.g. "sub.example.co.uk" down
+# to "co.uk" instead of "example.co.uk".
+_MULTI_PART_TLDS = {
+    "co.uk", "org.uk", "gov.uk", "ac.uk", "me.uk", "net.uk",
+    "com.au", "net.au", "org.au", "com.br", "net.br",
+    "com.mx", "com.ar", "com.co", "co.jp", "ne.jp", "or.jp",
+    "co.in", "net.in", "co.nz", "co.za", "com.sg", "com.tr",
+    "com.tw", "co.kr",
+}
 
-def collect(domain: str, timeout: int = 300, scope: list[str] | None = None) -> list[str]:
-    # subfinder -d only queries the single primary domain. Multi-domain scope
-    # entries in target yaml files need -dL (domain list file) so every
-    # in-scope domain gets enumerated, not just the primary one.
+
+def _apex(domain: str) -> str:
+    domain = domain.strip().lower().lstrip("*.").rstrip(".")
+    labels = domain.split(".")
+    if len(labels) <= 2:
+        return domain
+    last_two = ".".join(labels[-2:])
+    if last_two in _MULTI_PART_TLDS and len(labels) >= 3:
+        return ".".join(labels[-3:])
+    return last_two
+
+
+def collect(domain: str, timeout: int = 900, scope: list[str] | None = None) -> list[str]:
+    # Default bumped from 300s: -dL across many apex domains is slow — each
+    # passive source is queried per apex, and per-source rate limiting adds
+    # up fast with a large multi-domain scope.
+    # subfinder enumerates subdomains OF an apex — feeding it entries that are
+    # already subdomains (as a bug bounty program's scope list often is, e.g.
+    # 42 mixed apex/subdomain entries) makes -dL fail outright instead of
+    # just returning nothing useful. Reduce to unique apex domains first.
     domains = scope or [domain]
-    if len(domains) > 1:
+    apexes = sorted({_apex(d) for d in domains if d and d.strip()}) or [_apex(domain)]
+
+    if len(apexes) > 1:
         list_file = tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False)
         try:
-            list_file.write("\n".join(domains))
+            list_file.write("\n".join(apexes))
             list_file.close()
             cmd = ["subfinder", "-dL", list_file.name, "-silent"]
             return _run(cmd, timeout)
         finally:
             os.unlink(list_file.name)
-    return _run(["subfinder", "-d", domain, "-silent"], timeout)
+    return _run(["subfinder", "-d", apexes[0], "-silent"], timeout)
 
 
 def _run(cmd: list[str], timeout: int) -> list[str]:

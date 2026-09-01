@@ -23,9 +23,11 @@ collectors:
     timeout: 5        # per-host probe timeout (seconds)
   katana:
     enabled: true     # set false to skip katana entirely (e.g. waymore alone is enough)
-    depth: 2
-    timeout: 300      # max seconds katana is allowed to run
+    depth: 4
+    timeout: 900      # max seconds katana is allowed to run — depth 4 + 100+ seeds needs headroom
     js_crawl: true    # requires chromium; set false to disable headless crawling
+    concurrency: 25   # -c: concurrent fetchers (katana default 10)
+    parallelism: 15   # -p: concurrent inputs/seeds processed (katana default 10)
   waymore:
     mode: U           # URLs only
 

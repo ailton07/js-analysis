@@ -12,6 +12,8 @@ def collect(
     js_crawl: bool = True,
     timeout: int = 300,
     proxy: str = None,
+    concurrency: int = 10,
+    parallelism: int = 10,
 ) -> list[str]:
     if isinstance(target_urls, str):
         target_urls = [target_urls]
@@ -20,7 +22,7 @@ def collect(
     try:
         list_file.write("\n".join(target_urls))
         list_file.close()
-        return _run(list_file.name, depth, js_crawl, timeout, proxy)
+        return _run(list_file.name, depth, js_crawl, timeout, proxy, concurrency, parallelism)
     finally:
         os.unlink(list_file.name)
 
@@ -31,11 +33,15 @@ def _run(
     js_crawl: bool,
     timeout: int,
     proxy: str | None,
+    concurrency: int,
+    parallelism: int,
 ) -> list[str]:
     cmd = [
         "katana",
         "-list", list_path,
         "-d", str(depth),
+        "-c", str(concurrency),
+        "-p", str(parallelism),
         "-silent",
         "-no-color",
     ]
